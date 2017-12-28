@@ -18,6 +18,8 @@ from os.path import splitext
 
 from subprocess import Popen, PIPE
 
+from re import compile as regex_compile
+
 ###############################################################################
 
 def parse_command_line():
@@ -85,13 +87,13 @@ class io_manager:
 
     return self.input_pdf_data.pop()
 
-  # Lookahead at the nth line. 
-  def peek(self, n = 1):
-    if len(self.input_pdf_data) < n:
+  # Lookahead at the (n + 1)th line. 
+  def __getitem__(self, n):
+    if len(self.input_pdf_data) <= n:
       # We don't want to terminate on a peek.
       return ''
 
-    return self.input_pdf_data[-n]
+    return self.input_pdf_data[-(n + 1)]
 
   # Printable requirement.
   def write(self, str):
@@ -122,9 +124,9 @@ class io_manager:
 #
 #   statement_summary ::= (non_transaction_data* meta_data non_transaction_data*) - transaction_header
 #
-#   meta_data ::= transaction_period
+#   meta_data ::= statement_period
 #
-#   transaction_period ::= "Opening/Closing Date " month_day_year " - " month_day_year "\n"
+#   statement_period ::= "Opening/Closing Date " month_day_year " - " month_day_year "\n"
 #
 #   month_day_year ::= two_digits "/" two_digits "/" two_digits
 #
@@ -151,7 +153,7 @@ class io_manager:
 # 
 #   transaction_amount ::= "-"? positive_amount
 #
-#   positive_amount ::= (([0-9] [0-9]? [0-9]?) % thousands_separator)? decimal_separator [0-9]*
+#   positive_amount ::= ([0-9]{1,3} (thousands_separator [0-9]{3})*)? decimal_separator [0-9]*
 # 
 #   decimal_separator is local dependent
 #   thousands_separator is local dependent 
@@ -184,19 +186,19 @@ class io_manager:
 # transaction data lines, and then parse those fully. This works quite well;
 # most of the multi-line interactions in the parser can be treated as states:
 #
-# 0.) We start in the "summary" state.
-# 1.) We scan for meta data and transaction headers.
-# 2.) When we find the 1st transaction header, we enter the "transaction" state.
-#     * If we haven't found the necessary meta data when we transition to the
-#       "transaction" state, an error is raised.
-# 3.) We parse transaction records.
-#     * If we run out of input in this state, an error is raised.
-# 4.) When we we encounter a line that does not match as a transaction record,
-#     we enter the "non-transaction" state.
-# 5.) We scan for transaction headers.
-#     * If we run out of input in this state, parsing successfully terminates.
-# 6.) When we find the next transaction header, we enter the "transaction state".
-# 7.) Go to step 3.
+#  0.) We start in the "summary" state.
+#  1.) We scan for meta data.
+#  2.) When we find the meta data, we enter the "meta data" state.
+#  3.) We parse meta data.
+#  4.) We enter the "non-transaction" state.
+#  5.) We scan for transaction headers.
+#  6.) When we find the 1st transaction header, we enter the "transaction" state.
+#  7.) We parse transaction records.
+#  8.) When we we encounter a line that does not match as a transaction record,
+#      we enter the "non-transaction" state.
+#  9.) We scan for transaction headers.
+# 10.) When we find the next transaction header, we enter the "transaction state".
+# 11.) Go to step 7.
 # 
 # Regrettably, there is one more complicated multi-line interaction. Foreign
 # transactions are a superset of the domestic transaction record pattern and
@@ -213,12 +215,122 @@ class io_manager:
 # determine this. If this is the case, at the least the grammar needs to be
 # updated.
 
+###############################################################################
+
 class parser:
   SUMMARY_STATE         = 0
-  TRANSACTION_STATE     = 1
-  NON_TRANSACTION_STATE = 2
+  META_DATA_STATE       = 1
+  TRANSACTION_STATE     = 2
+  NON_TRANSACTION_STATE = 3
 
   state = None
+
+  iom = None
+
+  def __init__(self, iom):
+    self.state = self.SUMMARY_STATE
+    self.iom   = iom
+
+  def parse_summary(self):
+    # Scan for meta data (lookahead).
+    if self.iom[0].startswith("Opening/Closing Date "):
+      self.state = self.META_DATA_STATE
+    else:
+      # Only consume the line if it's not the start of the meta data.
+      self.iom.next()
+
+  def parse_meta_data(self):
+    # FIXME: Make this a class.
+
+    line = self.iom.next()
+
+    two_digits_rule       = r'[0-9]{2}'
+
+    month_day_year_rule   = r'(' + two_digits_rule + r')/' \
+                          + r'(' + two_digits_rule + r')/' \
+                          + r'(' + two_digits_rule + r')'
+
+    statement_period_rule = r'Opening/Closing Date '  \
+                          + month_day_year_rule       \
+                          + r' - '                    \
+                          + month_day_year_rule       \
+                          + r'$'
+
+    engine = regex_compile(statement_period_rule)                          
+   
+    match = engine.match(line)
+
+    assert match != None
+
+    print "PARSED OPENING MONTH:", match.group(1)
+    print "PARSED OPENING DAY:  ", match.group(2)
+    print "PARSED OPENING YEAR: ", match.group(3)
+    print "PARSED CLOSING MONTH:", match.group(4)
+    print "PARSED CLOSING DAY:  ", match.group(5)
+    print "PARSED CLOSING YEAR: ", match.group(6)
+
+    self.state = self.NON_TRANSACTION_STATE
+
+  def parse_non_transaction(self):
+    line = self.iom.next()
+
+    # Scan for transaction headers.
+    h1 = "Date of" 
+    h2 = "Transaction Merchant Name or Transaction Description $ Amount"
+    if line == h1 and self.iom[0] == h2: # Lookahead.
+      # Consume the rest of the header.
+      self.iom.next()
+
+      self.state = self.TRANSACTION_STATE
+
+  def parse_transaction(self):
+    # FIXME: Make this a class.
+
+    # TODO: Foreign
+
+    line = self.iom.next()
+
+    two_digits_rule = r'[0-9]{2}'
+
+    month_day_rule  = r'(' + two_digits_rule + r')/(' + two_digits_rule + r')'
+
+    decimal_separator_rule   = r'.' # TODO: Localization.
+    thousands_separator_rule = r',' # TODO: Localization.
+
+    positive_amount_rule = r'[0-9]{1,3}(?:' + thousands_separator_rule + r'[0-9]{3})*' + decimal_separator_rule + '[0-9]*'
+
+    transaction_amount_rule = r'(-?' + positive_amount_rule + r')'
+
+    transaction_description_rule = r'(.*)'
+
+    domestic_transaction_record_rule = month_day_rule + r' ' + transaction_description_rule + r' ' + transaction_amount_rule + r'$'
+
+    engine = regex_compile(domestic_transaction_record_rule)                          
+   
+    match = engine.match(line)
+
+    if match == None:
+      # We've reached the end of this transaction data block
+      self.state = self.NON_TRANSACTION_STATE
+    else:
+      print "PARSED TRANSACTION MONTH:      ", match.group(1)
+      print "PARSED TRANSACTION DAY:        ", match.group(2)
+      print "PARSED TRANSACTION DESCRIPTION:", match.group(3)
+      print "PARSED TRANSACTION AMOUNT:     ", match.group(4)
+
+  def parse(self):
+    while True:
+      print "STATE:", self.state
+      if   self.state == self.SUMMARY_STATE:
+        self.parse_summary()
+      elif self.state == self.META_DATA_STATE:
+        self.parse_meta_data()
+      elif self.state == self.TRANSACTION_STATE:
+        self.parse_transaction()
+      elif self.state == self.NON_TRANSACTION_STATE:
+        self.parse_non_transaction()
+      else:
+        assert false, "Parser state is invalid" 
 
 ###############################################################################
 
@@ -227,13 +339,14 @@ class parser:
 # Read input file into an array of lines and open the output file.
 iom = io_manager(*args)
 
+# Compile parser.
+p = parser(iom)
+
 # Parse array of lines and print transactions as we go.
-# TODO
+p.parse()
 
 # TESTING: Write pdftotext -raw output. 
 #for line in iom:
 #  print >> iom, line
-
-# TESTING: Parser state changes and scanning. 
 
 
