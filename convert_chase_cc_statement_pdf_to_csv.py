@@ -63,18 +63,24 @@ class io_manager:
     # dynamic arrays, but I assume so).
     self.input_pdf_data.reverse()
 
+  # Iterable requirement.
   def __iter__(self):
     return self
 
+  # Iterator requirement.
   def next(self):
     if len(self.input_pdf_data) == 0:
       raise StopIteration()
 
     return self.input_pdf_data.pop()
 
+  # Printable requirement.
+  def write(self, str):
+    self.output_csv_file.write(str)
+
 im = io_manager(*args)
 
 for line in im:
-  print line
+  print >> im, line
 
 
