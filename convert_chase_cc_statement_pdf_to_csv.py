@@ -10,7 +10,7 @@
 
 # TODO: Add support for '-' input, e.g. input from stdin.
 
-from sys import exit
+from sys import exit, stdout
 
 from optparse import OptionParser
 
@@ -23,52 +23,54 @@ op = OptionParser(
        "%prog [options] <input-pdf>\n"
 "       %prog [options] <input-pdf> <output-csv>\n"
 "\n"
-"Extracts transaction data from a Chase credit card statement PDF and writes the\n"
-"data to a CSV file.\n"
+"Extracts transaction data from a Chase credit card statement PDF and writes it\n"
+"to a CSV file.\n"
 "\n"
-"The first argument (<input-pdf>) should be the Chase credit card statement PDF\n"
-"file. The output CSV will be written to <output-csv> if it is provided. If\n"
-"<output-csv> is '-', the CSV is written to stdout. If <output-csv> is omitted,\n"
+"The first argument (<input-pdf>) specifies the Chase credit card statement PDF\n"
+"file to read. The output CSV will be written to <output-csv> if it is provided.\n"
+"If <output-csv> is '-', the CSV is written to stdout. If <output-csv> is omitted,\n"
 "the output is written to a '.csv' file with the same prefix as <input-pdf>"
     )
 )
 
 (options, args) = op.parse_args()
 
-if len(args) in range(1, 2)
+if len(args) not in range(1, 3):
   op.print_help()
   exit(1)
 
 class io_manager:
-  input_pdf  = None
-  output_csv = None
+  output_csv_file = None # File object that the output CSV is written to.
+  input_pdf_data  = None # Array of newline-terminated strings from the PDF.
 
-  input_data = None
+  def __init__(self, input_pdf_name, output_csv_name = None):
+    if   output_csv_name == "-":  # Output to stdout.
+      self.output_csv_file = stdout
+    elif output_csv_name == None: # Output to file: input prefix + '.csv'.
+      self.output_csv_file = open(splitext(input_pdf_name)[0] + ".csv", "w")
+    else:                         # Output to file: user-specified.
+      self.output_csv_file = open(output_csv_name, "w")
 
-  def __init__(self, input_pdf, output_csv = splitext(input_pdf)[0] + '.csv'):
-    self.input_pdf  = open(input_pdf, 'r')
-    self.output_pdf = open(output_pdf, 'w')
-
-    # Launch a subprocess that extracts the text from the PDF.
-    pdftotext = Popen(["pdftotext", "-raw", input_pdf, "-"], stdout = PIPE)
+    # Launch a subprocess that extracts the text from the input PDF.
+    pdftotext = Popen(["pdftotext", "-raw", input_pdf_name, "-"], stdout = PIPE)
 
     # Split the input into an array of lines.
-    self.input_data = pdftotext.communicate()[0].split('\n')
+    self.input_pdf_data = pdftotext.communicate()[0].split("\n")
 
     # Reverse the array of lines because we'll be popping lines from the array
     # starting with the first, and removing from the end is more efficient -
     # O(1) vs O(N) (I don't actually know if python lists are implemented as
     # dynamic arrays, but I assume so).
-    self.input_data.reverse()
+    self.input_pdf_data.reverse()
 
   def __iter__(self):
     return self
 
   def next(self):
-    if len(input_data) == 0:
+    if len(self.input_pdf_data) == 0:
       raise StopIteration()
 
-    return self.input_data.pop()
+    return self.input_pdf_data.pop()
 
 im = io_manager(*args)
 
