@@ -85,6 +85,14 @@ class io_manager:
 
     return self.input_pdf_data.pop()
 
+  # Lookahead at the nth line. 
+  def peek(self, n = 1):
+    if len(self.input_pdf_data) < n:
+      # We don't want to terminate on a peek.
+      return ''
+
+    return self.input_pdf_data[-n]
+
   # Printable requirement.
   def write(self, str):
     self.output_csv_file.write(str)
@@ -223,8 +231,9 @@ iom = io_manager(*args)
 # TODO
 
 # TESTING: Write pdftotext -raw output. 
-for line in iom:
-  print >> iom, line
+#for line in iom:
+#  print >> iom, line
 
+# TESTING: Parser state changes and scanning. 
 
 
