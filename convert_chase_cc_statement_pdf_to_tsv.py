@@ -590,17 +590,29 @@ class io_manager(object):
   def add_year(self, date):
     """Add the year to a `month_day` using the month to year mapping.
 
+    If the month cannot be found in the mapping, then the earliest year in the
+    mapping is used.
+
     Returns:
       A `month_day_year` object with the same month and day as `date`.
 
     Raises:
       AssertionError : If there is no month to year mapping for `date.month`.
     """
-    assert date.month in self.month_year_mapping,                             \
-      ("The month of `month_day` `{0}` was not found in the month to year " + \
-       "mapping `{1}`").format(date, self.month_year_mapping)
+    year = None
 
-    return month_day_year(date.month, date.day, self.month_year_mapping[date.month])
+    if date.month in self.month_year_mapping:
+      year = self.month_year_mapping[date.month]
+    else:
+      # There is usually 1 year in the mapping and at most there are 2 years
+      # for a January statement. In the case of a January statement, if the
+      # year of the transaction is the later year, it most have been a
+      # transaction in January, and thus it would be in the mapping. So, the
+      # correct year must be the earlier year. In all other cases, there is
+      # only one year in the mapping, so the earlier year is correct.
+      year = min(self.month_year_mapping.values())
+
+    return month_day_year(date.month, date.day, year)
 
 ###############################################################################
 
