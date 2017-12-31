@@ -288,8 +288,8 @@ class month_day(object):
     self.month = month
     self.day   = day
 
-    assert self.month in crange(1, 12), "Invalid month in date `{0}`.".format(self)
-    assert self.day   in crange(1, 31), "Invalid day in date `{0}`.".format(self)
+    assert self.month in crange(1, 12), ("Invalid month in date `{0}`.").format(self)
+    assert self.day   in crange(1, 31), ("Invalid day in date `{0}`.").format(self)
 
   def __str__(self):
     return '{0:0>2d}/{1:0>2d}'.format(self.month, self.day)
@@ -311,7 +311,7 @@ class month_day_year(month_day):
 
     super(month_day_year, self).__init__(month, day)
 
-    assert self.year in crange(0, 99), "Invalid year in date `{0}`.".format(self)
+    assert self.year in crange(0, 99), ("Invalid year in date `{0}`.").format(self)
 
   def __str__(self):
     return "{0:0>2d}/{1:0>2d}/{2:0>2d}".format(self.month, self.day, self.year)
@@ -347,11 +347,11 @@ class transit_leg(object):
     self.arrival = arrival
 
     assert type(self.code)      is str and len(self.code) == 1,       \
-      "Invalid code `{0}` in transit leg `{1}`".format(self.code, self)
+      ("Invalid code `{0}` in transit leg `{1}`").format(self.code, self)
     assert type(self.departure) is str and len(self.departure) == 3,  \
-      "Invalid departure `{0}` in transit leg `{1}`".format(self.departure, self)
+      ("Invalid departure `{0}` in transit leg `{1}`").format(self.departure, self)
     assert type(self.arrival)   is str and len(self.arrival) == 3,    \
-      "Invalid arrival `{0}` in transit leg `{1}`".format(self.arrival, self)
+      ("Invalid arrival `{0}` in transit leg `{1}`").format(self.arrival, self)
 
   def __str__(self):
     return "{0}({1}->{2})".format(self.code, self.departure, self.arrival)
@@ -583,9 +583,9 @@ class io_manager(object):
       self.add_month_year_mapping(t.opening)
       self.add_month_year_mapping(t.closing)
     else:
-      assert False,                                                           \
-        "Cannot add `{0}` of type `{1}` to the month year mapping because " + \
-        "it is not a `month_day_year` or `period`.".format(t, type(t))
+      assert False,                                                            \
+        ("Cannot add `{0}` of type `{1}` to the month year mapping because " + \
+         "it is not a `month_day_year` or `period`.").format(t, type(t))
 
   def add_year(self, date):
     """Add the year to a `month_day` using the month to year mapping.
@@ -596,9 +596,9 @@ class io_manager(object):
     Raises:
       AssertionError : If there is no month to year mapping for `date.month`.
     """
-    assert date.month in self.month_year_mapping,                            \
-      "The month of `month_day` `{0}` was not found in the month to year " + \
-      "mapping {1}".format(date.month, self.month_year_mapping)
+    assert date.month in self.month_year_mapping,                             \
+      ("The month of `month_day` `{0}` was not found in the month to year " + \
+       "mapping `{1}`").format(date, self.month_year_mapping)
 
     return month_day_year(date.month, date.day, self.month_year_mapping[date.month])
 
@@ -862,11 +862,11 @@ class transaction_record_parser(object):
       # 2nd line.
       foreign2_match = self.exchange_date_and_currency_engine.match(iom[0])
 
-      assert foreign2_match is not None,                                  \
-        "Foreign transaction record 1st line (date, description and "   + \
-        "amount) `{0}` and 3rd line (exchange rate calculation) `{2}` " + \
-        "matched, but 2nd line (exchange date and currency) `{1}` did " + \
-        "not.".format(domestic_match.string, iom[0], iom[1])
+      assert foreign2_match is not None,                                   \
+        ("Foreign transaction record 1st line (date, description and "   + \
+         "amount) `{0}` and 3rd line (exchange rate calculation) `{2}` " + \
+         "matched, but 2nd line (exchange date and currency) `{1}` did " + \
+         "not.").format(domestic_match.string, iom[0], iom[1])
 
       # Now we definitely have a foreign transaction record, so we consume the
       # two lines we peeked. 
@@ -1006,7 +1006,7 @@ class record_parser(enum(
     if   self.state == self.META_DATA_STATE:
       assert len(self.meta_data_parsers) > 0,                            \
         "`record_parser` is in META_DATA_STATE but there are no more " + \
-        "meta-data parsers"
+        "meta-data parsers."
 
       (meta_data_parser, meta_data_action) = self.meta_data_parsers[-1]
 
@@ -1058,7 +1058,7 @@ class record_parser(enum(
         self.state = self.NON_TRANSACTION_STATE
 
     else:
-      assert False, "Parser state `{0}` is invalid.".format(self.state) 
+      assert False, ("Parser state `{0}` is invalid.").format(self.state)
 
     # We didn't match anything else, so we must be on a non-transaction record
     # or out of input.
