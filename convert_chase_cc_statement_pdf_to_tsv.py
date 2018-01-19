@@ -245,7 +245,7 @@ def parse_command_line():
       "The 1st argument (<input-pdf>) specifies the Chase credit card statement PDF file\n"
       "to read. The output TSV will be written to <output-tsv> if it is provided. If\n"
       "<output-tsv> is '-', the TSV is written to stdout. If <output-tsv> is omitted,\n"
-      "the output is written to a '.tsv' file with the same prefix as <input-pdf>"
+      "the output is written to a '.tsv' file with the same prefix as <input-pdf>\n"
       "\n"
       "NOTE: This program was designed for and tested with Chase Sapphire credit card\n"
       "statements. Some aspects of this program may not work for other Chase credit\n"
