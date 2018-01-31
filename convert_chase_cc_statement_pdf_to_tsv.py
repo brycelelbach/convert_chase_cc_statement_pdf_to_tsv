@@ -183,7 +183,7 @@ from os.path import splitext
 
 from subprocess import Popen, PIPE
 
-from optparse import OptionParser
+from argparse import ArgumentParser as argument_parser
 
 from re import compile as regex_compile
 from re import escape  as regex_escape
@@ -233,46 +233,47 @@ def enum(*states):
 
 ###############################################################################
 
-def parse_command_line():
-  op = OptionParser(
-    usage=(
-             "%prog [options] <input-pdf>\n"
-      "       %prog [options] <input-pdf> <output-tsv>\n"
-      "\n"
-      "Extracts transaction records from a Chase credit card statement PDF and writes it\n"
-      "to a tab-separated-values (TSV) file.\n"
-      "\n"
-      "The 1st argument (<input-pdf>) specifies the Chase credit card statement PDF file\n"
-      "to read. The output TSV will be written to <output-tsv> if it is provided. If\n"
-      "<output-tsv> is '-', the TSV is written to stdout. If <output-tsv> is omitted,\n"
-      "the output is written to a '.tsv' file with the same prefix as <input-pdf>\n"
-      "\n"
-      "NOTE: This program was designed for and tested with Chase Sapphire credit card\n"
-      "statements. Some aspects of this program may not work for other Chase credit\n"
-      "cards.\n"
+def process_program_arguments():
+  ap = argument_parser(
+    description = (
+      "Extracts transaction records from a Chase credit card statement PDF and "
+      "writes it to a tab-separated-values (TSV) file. This program was "
+      "designed for and tested with Chase Sapphire credit card statements. "
+      "Some aspects of this program may not work for other Chase credit cards. "
     )
   )
 
-  op.add_option(
-      "-n", "--no-header",
-      help=("Do not write a header row that describes each column."),
-      action="store_false", dest="header", default=True
+  ap.add_argument(
+    "-n", "--no-header",
+    help = ("Do not write a header row that describes each column."),
+    action = "store_false", dest = "header", default = True
   )
 
-  op.add_option(
-      "-d", "--debug",
-      help=("Print all records parsed and debugging information, and omit the "
+  ap.add_argument(
+    "-d", "--debug",
+    help = ("Print all records parsed and debugging information, and omit the "
             "header row."),
-      action="store_true", dest="debug", default=False
+    action = "store_true", dest="debug", default = False
   )
 
-  (options, args) = op.parse_args()
+  ap.add_argument(
+    "input_pdf", 
+    help = ("The Chase credit card statement PDF file to read."),
+    type = str,
+    metavar = "input-pdf"
+  )
 
-  if len(args) not in crange(1, 2):
-    op.print_help()
-    exit(1)
+  ap.add_argument(
+    "output_tsv", 
+    help = ("The file that the TSV output will be written to. If `-` is "
+            "specified, output is written to `stdout`. If this parameter is "
+            "omitted, the output is written to a `.tsv` file with the same "
+            "prefix as the input PDF."),
+    type = str, default = None, nargs = "?",
+    metavar = "output-pdf"
+  )
 
-  return (options, args)
+  return ap.parse_args()
 
 ###############################################################################
 
@@ -1088,16 +1089,16 @@ class record_parser(enum(
 
 ###############################################################################
 
-(options, args) = parse_command_line()
+args = process_program_arguments()
 
 # Read input file into an list of lines and open the output file.
-iom = io_manager(*args)
+iom = io_manager(args.input_pdf, args.output_tsv)
 
 # Compile parser.
 p = record_parser()
 
 # Print the TSV header.
-if options.header and not options.debug:
+if args.header and not args.debug:
   print >> iom, "Transaction Type\t"                                            + \
                 "Transaction Date\t"                                            + \
                 "Transaction Description\t"                                     + \
@@ -1111,7 +1112,7 @@ if options.header and not options.debug:
 
 action = None
 
-if options.debug:
+if args.debug:
   # Debug output mode: print debug info and all records.
   def print_any_record(iom, tup):
     (state, sub_parser, value) = tup
